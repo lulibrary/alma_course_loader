@@ -36,8 +36,8 @@ module AlmaCourseLoader
       COURSE_CODE
       COURSE_TITLE
       SECTION_ID
-      PROC_DEPT
       ACAD_DEPT
+      PROC_DEPT
       TERM1
       TERM2
       TERM3
@@ -49,7 +49,7 @@ module AlmaCourseLoader
       YEAR
       SEARCH_ID1
       SEARCH_ID2
-      SEARCH_ID3
+      ALL_SEARCHABLE_IDS
       INSTR1
       INSTR2
       INSTR3
@@ -75,6 +75,7 @@ module AlmaCourseLoader
       op, rollover = write_op(op)
       # Write the course data to a tab-separated CSV file
       CSV.open(filename, 'wb', col_sep: "\t") do |csv|
+        # Write the header row
         csv << ROW_HEADERS
         # Write a row for each course entry
         courses.each_row { |row| csv << row_data(row, op, rollover) }

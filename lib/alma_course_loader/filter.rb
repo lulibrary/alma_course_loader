@@ -1,7 +1,13 @@
+require 'json'
+require 'set'
+
 module AlmaCourseLoader
   # Implements a filter with a call() method accepting a year, course and cohort
   # and returning true if the course should be processed, false otherwise.
   class Filter
+    # The regular expression describing a filter string
+    FILTER = /((?<extractor>[^+-]*)(?<mode>[+-]))?(?<value>.*)/
+
     # @!attribute [rw] extractor
     #   @return [Proc, Method] a block accepting a year, course and cohort and
     #     returning the value used in filter matching
@@ -20,6 +26,61 @@ module AlmaCourseLoader
     #     Other          - the matched value must be equal to this value
     attr_accessor :values
 
+    # Parses a filter string and returns a Filter instance
+    # @param str [String] the filter string: [extractor][+|-]value
+    #   where extractor is the optional name of an entry in the extractors hash,
+    #   +|- optionally specifies the mode (+ = :include, - = :exclude),
+    #   value is a JSON string specifying the value(s) to match
+    # @param extractors [Hash<Symbol, Proc|Method>] a hash of named field
+    #   extractors referenced by the filter string; this may include a nil
+    #   key which specifies the default extactor if not given in the filter
+    #   string
+    # @raise [ArgumentError] if the filter string is invalid
+    def self.parse(str = nil, extractors = nil)
+      # Parse the filter string
+      raise ArgumentError, 'expected filter' if str.nil? || str.empty?
+      match = FILTER.match(str)
+      raise ArgumentError, "invalid filter: #{str}" if match.nil?
+      # The default mode is :include unless :exclude is specified
+      mode = match[:mode] == '-' ? :exclude : :include
+      # Get the named extractor from the hash or block
+      extractor = parse_extractor(match, extractors)
+      # Get the filter value(s)
+      value = parse_value(match)
+      # Return an instance using the filter string values
+      new(value, mode, extractor)
+    end
+
+    # Returns the extractor Proc specified by a parsed filter string
+    # @param match [MatchData] the parsed filter string
+    # @param extractors [Hash<Symbol, Proc|Method>] the extractors
+    # @raise [ArgumentError] if a specified extractor is invalid or there is no
+    #   default extractor in extractors when required
+    def self.parse_extractor(match, extractors = nil)
+      raise ArgumentError, 'extractors required' \
+        if extractors.nil? || extractors.empty?
+      e = match[:extractor] || ''
+      # If no extractor is specified, use the default extractor
+      extractor = extractors[e] || extractors[e.to_sym]
+      return extractor unless extractor.nil?
+      # If an extractor is specified, it is invalid; otherwise the default
+      # extractor is specified but not present.
+      msg = e.empty? ? 'no default extractor' : "invalid extractor: #{e}"
+      raise ArgumentError, msg
+    end
+    private_class_method :parse_extractor
+
+    # Returns the parsed JSON value string
+    # @param match [MatchData] the parsed filter string
+    # @raise [ArgumentError] if the value string cannot be parsed
+    def self.parse_value(match)
+      value = match[:value]
+      JSON.parse(value)
+    rescue JSON::ParserError
+      raise ArgumentError, "invalid value: #{value}"
+    end
+    private_class_method :parse_value
+
     # Initialises a new Filter instance
     # @param values [Object] the value or collection to match against
     # @param mode [Symbol] the filter comparison mode
@@ -29,7 +90,7 @@ module AlmaCourseLoader
     #   cohort and returning the value used in filter matching.
     #   This may be also passed as a code block.
     # @return [void]
-    def initialize(values = nil, mode = :include, extractor = nil, &block)
+    def initialize(values = nil, mode = nil, extractor = nil, &block)
       self.extractor = extractor || block
       self.mode = mode || :include
       self.values = values
