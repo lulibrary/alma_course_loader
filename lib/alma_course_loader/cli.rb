@@ -15,6 +15,16 @@ module AlmaCourseLoader
            'filter condition: [field][+|-]value', multivalued: true do |value|
       Filter.parse(value, extractors)
     end
+    option %w[-l --log-file], 'LOG_FILE', 'the activity log file'
+    option %w[-L --log-level], 'LOG_LEVEL',
+           'the log level (fatal|error|warn|info|debug)' do |value|
+      { 'debug' => Logger::DEBUG,
+        'error' => Logger::ERROR,
+        'fatal' => Logger::FATAL,
+        'info' => Logger::INFO,
+        'warn' => Logger::WARN
+      }[value.downcase] || Logger::ERROR
+    end
     option %w[-o --out-file], 'OUT_FILE', 'the output file'
     option %w[-r --rollover], :flag, 'generate a course rollover file'
     option %w[-t --time-period], 'PERIOD',
@@ -49,6 +59,14 @@ module AlmaCourseLoader
       Dotenv.load(env_file) unless env_file.nil? || env_file.empty?
       AlmaCourseLoader::Writer.write(out_file, op, reader)
       exit(EXIT_OK)
+    end
+
+    # Creates a Logger instance
+    def logger
+      return nil unless log_file
+      logger = Logger.new(log_file)
+      logger.level = log_level
+      logger
     end
 
     # Creates a Reader instance to retrieve course data
