@@ -10,6 +10,7 @@ module AlmaCourseLoader
     EXIT_OK = 0
 
     # Clamp command-line options
+    option %w[-d --delete], :flag, 'generate a course delete file'
     option %w[-e --env-file], 'ENV_FILE', 'environment definitions file'
     option %w[-f --filter], 'FILTER',
            'filter condition: [field][+|-]value', multivalued: true do |value|
@@ -55,7 +56,13 @@ module AlmaCourseLoader
     # Clamp entry point - executes the command
     # @return [void]
     def execute
-      op = rollover? ? :rollover : :update
+      op = if rollover?
+             :rollover
+           elsif delete?
+             :delete
+           else
+             :update
+           end
       Dotenv.load(env_file) unless env_file.nil? || env_file.empty?
       AlmaCourseLoader::Writer.write(out_file, op, reader)
       exit(EXIT_OK)
