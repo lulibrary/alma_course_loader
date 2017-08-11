@@ -70,11 +70,27 @@ module AlmaCourseLoader
     end
     private_class_method :parse_extractor
 
-    # Returns the parsed JSON value string
+    # Returns a parsed regular expression
+    # @param regexp [String] the regular expression from the value string
+    # @return [Regexp] the parsed regular expression
+    # @raise [ArgumentError] if the regular expression cannot be parsed
+    def self.parse_regexp(regexp)
+      # The regexp string always begins with /, the trailing / is optional
+      last = regexp.end_with?('/') ? -2 : -1
+      Regexp.new(regexp[1..last])
+    rescue RegexpError
+      raise ArgumentError, "invalid regular expression: #{regexp}"
+    end
+
+    # Returns the parsed value string
     # @param match [MatchData] the parsed filter string
     # @raise [ArgumentError] if the value string cannot be parsed
     def self.parse_value(match)
       value = match[:value]
+      return nil if value.nil?
+      # Parse strings starting with / as regular expressions
+      return parse_regexp(value) if value.start_with?('/')
+      # Parse all other strings as JSON
       JSON.parse(value)
     rescue JSON::ParserError
       raise ArgumentError, "invalid value: #{value}"

@@ -1,3 +1,4 @@
+require 'alma_course_loader/diff'
 require 'alma_course_loader/filter'
 require 'alma_course_loader/reader'
 require 'alma_course_loader/writer'

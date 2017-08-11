@@ -1,0 +1,8 @@
+Course Code	Course Title	Section Id	Academic Dept	Processing Dept	Term1	Term2	Term3	Term4	Start Date	End Date	Number of Participants	Weekly Hours	Year	Searchable Id 1	Searchable Id 2	All Searchable Ids	Instructor 1	Instructor 2	Instructor 3	Instructor 4	Instructor 5	Instructor 6	Instructor 7	Instructor 8	Instructor 9	Instructor 10	All Instructors	Operation	Old Course Code	Old Course Section
+CRS101-2017	First year 1 course	1	CRS	LIB	1				2017-10-01	2017-12-14	50	4	2017-18	CRS101	CRS												inst1	ROLLOVER	CRS101-2016	1
+CRS102-2017	Second year 1 course	1	CRS	LIB	2				2018-01-14	2017-03-31	50	4	2017-18	CRS102	CRS												inst1,inst2	DELETE	CRS102-2016	1
+CRS103-2017	Third year 1 course (revised)	1	CRS	LIB	3				2018-04-25	2018-06-14	25	4	2017-18	CRS103	CRS												inst1		CRS103-2016	1
+CRS201-2017	First year 2 course	1	CRS	LIB	1				2017-10-01	2017-12-14	50	4	2017-18	CRS201	CRS												inst2	DELETE	CRS201-2016	1
+CRS202-2017	Second year 2 course	1	CRS	LIB	2				2018-01-14	2018-03-31	50	4	2017-18	CRS202	CRS												inst2,inst3		CRS202-2016	1
+CRS203-2017	Third year 2 course	1	CRS	LIB	3				2018-04-25	2018-06-14	25	4	2017-18	CRS203	CRS												inst2	ROLLOVER	CRS203-2016	1
+CRS210-2017	Year 2 project	1	CRS	LIB	2				2018-01-14	2018-06-14	50	8	2017-18	CRS210	CRS												inst4

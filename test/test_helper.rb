@@ -1,6 +1,6 @@
 $LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
 require 'alma_course_loader'
-require 'alma_course_loader/cli'
+require 'alma_course_loader/cli/course_loader'
 
 require 'minitest/autorun'
 require 'minitest/reporters'
@@ -52,7 +52,7 @@ module Assertions
     course_code = data[0].split('-')
     assert_course_details(:course, course_code[0], constraints)
     assert_course_details(:cohort, course_code[2], constraints)
-    assert_course_details(:year, course_code[1], constraints)
+    assert_course_details(:year, course_code[1].to_i, constraints)
   end
 
   # Fails if the entry does not match file-level constraints
@@ -192,7 +192,7 @@ module Constraints
     constraints = {
       course: { empty: false, max: 'CRS110', min: 'CRS101' },
       file: { op: op },
-      year: { empty: false, max: '2016', min: '2015' }
+      year: { empty: false, max: 2016, min: 2015 }
     }
     cohort_constraints(use_cohorts, constraints)
     constraints
@@ -221,7 +221,7 @@ module Helpers
 end
 
 # Implements a mock course reader for testing
-class CourseReader < AlmaCourseLoader::Reader
+class CourseReader < ::AlmaCourseLoader::Reader
   attr_accessor :use_cohorts
 
   def initialize(*args, use_cohorts: true, **kwargs)
@@ -283,7 +283,7 @@ class CourseReader < AlmaCourseLoader::Reader
 end
 
 # Implements a mock CLI for testing
-class CourseCLI < AlmaCourseLoader::CLI
+class CourseCLI < ::AlmaCourseLoader::CLI::CourseLoader
   def extractors
     {
       cohort: proc { |_year, _course, cohort| cohort },

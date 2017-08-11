@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'alma_course_loader/cli/diff'
+require 'raven'
+
+dsn = ENV['SENTRY_DSN']
+Raven.configure { |config| config.dsn = dsn } unless dsn.nil? || dsn.empty?
+AlmaCourseLoader::CLI::Diff.run
