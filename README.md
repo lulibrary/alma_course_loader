@@ -5,6 +5,13 @@ It provides a `Reader` class which serves as a basis for iterating over courses
 from some data source, and a `Writer` class which uses the `Reader` to generate
 a course loader file.
 
+A command-line script `course_loader_diff` is also provided for comparing two
+course loader files and generating further course loader files containing the
+appropiate delete/update operations. 
+
+The implementation of classes and command-line scripts to generate course loader
+files from specific data sources is left to clients of this gem.
+
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -21,7 +28,80 @@ Or install it yourself as:
 
     $ gem install alma_course_loader
 
-## Usage
+## Configuring Course Loading
+
+1. Write a command-line script to create a course loader file from your course
+manager or other data source. This gem provides helper classes to assist with
+this - see *Writing a Course Loader* below.
+
+2. Schedule this script to run at regular intervals.
+
+3. Schedule the script `course_loader_diff` to run after the course loader
+script to generate the deletions and updates to be processed by Alma.
+
+4. Schedule Alma course loader jobs to run after `course_loader_diff` to
+process the generated files.
+
+An example using `cron` to schedule a daily course update using the fictitious
+course loader script `load_courses_from_cms` might be:
+```bash
+# File locations
+dir_data=/home/alma/course/data
+dir_delete=/home/alma/course/delete
+dir_update=/home/alma/course/update
+
+# Use dates as filenames
+today=$(date +%Y%m%d)
+yday=$(date -d "-1 day" +%Y%m%d)
+
+# Files
+data_today=${dir_data}/$today
+data_yday=${dir_data}/$yday 
+del=${dir_delete}/$today
+log=/var/log/course/$today
+upd=${dir_update}/$today
+
+# Load courses from course management system daily at 1am
+00 01 * * * /opt/bin/load_courses_from_cms --out=$data_today
+
+# Write changes to Alma course loader files, log verbosely to $log
+00 04 * * * /opt/bin/course_loader_diff --delete=$del --log=$log --update=$upd --verbose $data_yday $data_today
+```
+
+## Command-line Scripts
+
+### course_loader_diff
+
+This script accepts two course loader files (the "current" or most-recently
+created file, and the "previous" file preceding the current file) and outputs
+a file of deletions (courses appearing on the previous file but not in the
+current file) and a file of additions/updates (courses appearing in the current
+file which do not appear or differ from those in the previous file). These files
+can be loaded into Alma to perform the required changes.
+
+Basic usage is:
+```bash
+course_loader_diff -d deletions-file -u updates-file previous-file current-file
+```
+where `deletions-file` is the output file of deletions, `updates-file` is the
+output file of additions/updates, `previous-file` is the previous input file and
+`current-file` is the current input file.
+
+Detailed usage is available from the command's help page:
+```bash
+course_loader_diff -h
+```
+
+## Writing a Course Loader
+
+This gem provides helper classes which may help to generate Alma course loader
+files from any data source. It is not necessary to use these, as long as the
+output of the course loader is a valid Alma course loader file representing the
+source course data.
+
+The helper classes abstract course loader file generation into a `Reader` which
+iterates over the source data, a `Filter` which selects courses for processing
+and a `Writer` which generates the Alma course loader file.
 
 ### Reader
 
@@ -195,7 +275,6 @@ end
 # Populates the data array for a course element row in the Alma course
 # loader CSV file. The data array is pre-allocated by the caller.
 def row_data(data, year, course, cohort, instructors)
-
   # The implementation must define the current course details
   data[0] = 'Current-year-course-code'
   # :
@@ -205,7 +284,6 @@ def row_data(data, year, course, cohort, instructors)
   # These will be ignored by the Writer unless required for rollover
   data[29] = 'Previous-year-course-code'
   data[30] = 'Previous-year-section-id'
-
 end
 ```
 
@@ -232,7 +310,7 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/alma_course_loader. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/lulibrary/alma_course_loader. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
 
 ## License
