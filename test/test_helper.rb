@@ -284,12 +284,20 @@ end
 
 # Implements a mock CLI for testing
 class CourseCLI < ::AlmaCourseLoader::CLI::CourseLoader
+  def extractor_details
+    {
+      cohort: 'Course cohort',
+      course: 'Course code',
+      year: 'Course year'
+    }.freeze
+  end
+
   def extractors
     {
       cohort: proc { |_year, _course, cohort| cohort },
       course: proc { |_year, course, _cohort| course },
       year: proc { |year, _course, _cohort| year }
-    }
+    }.freeze
   end
 
   def reader

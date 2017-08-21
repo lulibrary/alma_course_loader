@@ -17,15 +17,17 @@ module AlmaCourseLoader
              'filter condition: [field][+|-]value', multivalued: true do |value|
         Filter.parse(value, extractors)
       end
+      option %w[-F --fields], :flag, 'list the fields available to filters'
       option %w[-l --log-file], 'LOG_FILE', 'the activity log file'
       option %w[-L --log-level], 'LOG_LEVEL',
              'the log level (fatal|error|warn|info|debug)' do |value|
-        { 'debug' => Logger::DEBUG,
-          'error' => Logger::ERROR,
-          'fatal' => Logger::FATAL,
-          'info' => Logger::INFO,
-          'warn' => Logger::WARN
-        }[value.downcase] || Logger::ERROR
+        {
+          debug: Logger::DEBUG,
+          error: Logger::ERROR,
+          fatal: Logger::FATAL,
+          info: Logger::INFO,
+          warn: Logger::WARN
+        }[value.downcase.to_sym] || Logger::ERROR
       end
       option %w[-o --out-file], 'OUT_FILE', 'the output file'
       option %w[-r --rollover], :flag, 'generate a course rollover file'
@@ -47,6 +49,15 @@ module AlmaCourseLoader
         exit(code) if code
       end
 
+      # Returns a hash of named field value extractor descriptions. Keys
+      # correspond to the keys of the extractors hash, values should be short
+      # descriptions of each field extractor.
+      # @abstract Subclasses should implement this method
+      # @return [Hash<String|Symbol, String>] the field extractor descriptions
+      def extractor_details
+        nil
+      end
+
       # Returns a hash of named field value extractors
       # @abstract Subclasses must implement this method
       # @return [Hash<String|Symbol, Method|Proc>] the field extractors
@@ -57,19 +68,22 @@ module AlmaCourseLoader
       # Clamp entry point - executes the command
       # @return [void]
       def execute
-        op = if rollover?
-               :rollover
-             elsif delete?
-               :delete
-             else
-               :update
-             end
-        Dotenv.load(env_file) unless env_file.nil? || env_file.empty?
-        AlmaCourseLoader::Writer.write(out_file, op, reader)
+        # List the available field extractors and exit if required
+        list_fields if fields?
+        # Otherwise write a course loader file and exit
+        write_file
+      end
+
+      # Lists the available field extractors and exits
+      # @return [void]
+      def list_fields
+        d = extractor_details || {}
+        extractors.each_key { |k| puts "#{k}#{d[k] ? ': ' : ''}#{d[k] || ''}" }
         exit(EXIT_OK)
       end
 
       # Creates a Logger instance
+      # @return [Logger] the Logger instance
       def logger
         return nil unless log_file
         logger = Logger.new(log_file)
@@ -88,10 +102,25 @@ module AlmaCourseLoader
 
       # Parses a time period string and returns an appropriate representation
       # @abstract Subclasses may implement this method
-      # @param time_period_s [String] the string representation of the time period
+      # @param time_period_s [String] the time period string
       # @return [Object] the subclass-specific representation of the time period
       def time_period(time_period_s)
         time_period_s
+      end
+
+      # Writes an Alma course loader file and exits
+      # @return [void]
+      def write_file
+        op = if rollover?
+               :rollover
+             elsif delete?
+               :delete
+             else
+               :update
+             end
+        Dotenv.load(env_file) unless env_file.nil? || env_file.empty?
+        AlmaCourseLoader::Writer.write(out_file, op, reader)
+        exit(EXIT_OK)
       end
     end
   end

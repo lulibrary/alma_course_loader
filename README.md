@@ -166,7 +166,9 @@ matches it against a known value or set of values. If the match succeeds, the
 filter returns `true` and the course element has *passed* the filter. If the
 match fails, the filter returns `false` and the course element is rejected.
 
-To create a filter, pass in the value(s) to be matched against, the match
+###### Constructor
+
+To construct a filter, pass in the value(s) to be matched against, the match
 criterion (whether a match is considered a success or failure) and a code
 block which extracts the match value from the course element.
 ```ruby
@@ -191,6 +193,48 @@ value)
 The extractor is a `Proc` or code block which accepts the year, course and
 cohort and returns a value to be matched against the filter's values.
 
+###### Parsing
+
+A `Filter` can also be created by parsing a filter specification string:
+
+```ruby
+filter = Filter.parse(filter_s, extractors)
+```
+
+where `filter_s` is the filter specification string (see *Filter specification
+strings* below) and `extractors` is a `Hash` mapping `Symbol` (extractor names)
+to extractor `Proc` instances.
+
+##### Filter specification strings
+ 
+The general form of a filter specification string is:
+
+```field[+|-]value```
+
+where:
+ * `field` is the name of a defined field extractor,
+ * `+` means that `value` mus include the field value;
+ * `-` means that `value` must not include the field value.
+ * `value` is either a JSON string (which must include double-quotes around string
+literal values and may specify arrays and hashes) or a regular expression
+delimited by `/`.
+
+Examples:
+
+```ruby
+# Course code must exactly match CS101
+course_code+"CS101"    
+
+# Course code must be one of CS101, CS102 or CS103
+course_code+["CS101", "CS102", "CS103"]
+
+# Year must not be 2015 or 2016
+year-[2015, 2016]
+
+# Course code must begin with CS
+course_code+/^CS/
+```
+
 ##### Examples 
 ```ruby
 codes = ['COMPSCI101', 'MAGIC101']
@@ -198,15 +242,22 @@ year1_magic = /MAGIC1\d\d/
 
 # Extractor
 get_code = proc { |year, course, cohort| course.code }
+extractors = { code: get_code }
 
 # Include only the specified codes
 filter = AlmaCourseLoader::Filter.new(codes, :include, get_code)
+
+# As above using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('code+["COMPSCI101", "MAGIC101"]', extractors)
 
 # Include all except the specified codes
 filter = AlmaCourseLoader::Filter.new(codes, :exclude, get_code)
 
 # Include all codes matching the regular expression
 filter = AlmaCourseLoader::Filter.new(year1_magic, :include, get_code)
+
+# As above using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('code+/MAGIC\d\d/', extractors)
 ```
 
 ##### Executing a filter
@@ -302,6 +353,130 @@ elements provided by the `reader`. This may be:
 * `:rollover` to implement rollover to the courses defined by the file
 * `:update` to update the courses in the file
 
+### Command Line Scripts
+
+The `CLI::CourseLoader` class provides support for writing command-line course
+loader scripts.
+
+#### Extending CLI::CourseLoader
+
+To implement a course loader command-line script, clients should subclass
+`CLI::CourseLoader` and implement the following methods:
+
+##### `extractors`
+
+This method defines the field extractors available to filter specifications.
+It returns a `Hash` mapping symbols (extractor names) to `Proc` instances
+responsible for extracting a single field of the course data. The hash keys are
+the field names used in filter specifications.
+
+Each `Proc` instance of the form:
+```ruby
+proc { |year, course, cohort| # return some field value }
+``` 
+
+The following example defines the fields `course` and `year` for use in filters:
+```ruby
+# Field descriptions
+def extractor_details
+  {
+    course: 'Course code',
+    year: 'Course year'
+  }.freeze
+end
+
+# Field definitions
+def extractors
+  {
+    course: proc { |year, course, cohort| course.course_code },
+    year: proc { |year, course, cohort| year }
+  }.freeze
+end
+```
+
+##### `reader`
+
+This should return an instance of a subclass of `AlmaCourseLoader::Reader` which
+returns courses from the course manager data source.
+
+##### `time_period(time_period_s)`
+
+This method accepts a client-specific string representation of a time period
+and returns an appropriate internal object representing that time period. For
+example:
+
+```ruby
+def time_period(time_period_s)
+  # Accept strings such as "2017-18" but internally work with integer years
+  time_period_s[0..3].to_i
+end
+```
+
+#### Command-Line Usage
+
+Course loader scripts derived from `CLI::CourseLoader` accept the following
+command-line options:
+
+```bash
+course_loader [-d|--delete]
+              [-e|--env=env-file]
+              [-f|--filter=filter]...
+              [-F|--fields]
+              [-l|--log-file=log-file]
+              [-L|--log-level=debug|error|fatal|info|warn]
+              [-o|--out-file=output-file]
+              [-r|--rollover]
+              [-t|--time-period=time-period]...
+```
+
+##### `-d | --delete`
+
+Adds the `DELETE` operation to the course loader file, causing all entries in
+the file to be deleted when the file is processed by Alma.
+
+##### `-e env-file | --env=env-file`
+
+Specifies a file of environment variable definitions for configuration
+
+##### `-f filter | --filter=filter`
+
+Specifies a filter restricting the courses to be exported. See *Filter
+specification strings* for the filter syntax. This flag may be repeated to
+specify multiple filters; a course must pass every filter to be included in the
+export. 
+
+##### `-F | --fields`
+
+Lists the fields available to filters.
+
+##### `-h | --help`
+
+Displays a help page for the command-line interface.
+
+##### `-l log-file | --log-file=log-file`
+
+Specifies a file for logging course loader activity
+
+##### `-L log-level | --log-level=log-level`
+
+Specifies the logging level: `fatal|error|warn|info|debug`
+
+##### `-o out-file | --out-file=out-file`
+
+Specifies the output course loader file
+
+##### `-r | --rollover`
+
+Adds the `ROLLOVER` operation and previous course code/section to the course
+loader file, triggering Alma's course rollover processing for the specified
+courses. 
+
+##### `-t time-period | --time-period=time-period`
+
+Specifies the course time period covered by the export. This flag may be
+repeated to specify multiple time periods. 
+The exact syntax and meaning of `time-period` is left to clients of this gem.
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake test` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
@@ -316,4 +491,3 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/lulibr
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-
