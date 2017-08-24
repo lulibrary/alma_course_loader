@@ -1,50 +1,79 @@
+require 'logger'
+
 module AlmaCourseLoader
-  # Compares two course loader files and outputs a file of deletions and a file
-  # of updates
+  # Exception raised by the diff block to ignore the current course
+  class SkipCourse < StandardError; end
+
+  # Compares two course loader files and outputs separate files of new, deleted
+  # and updated courses
   class Diff
+    # Course loader operations
+    OPS = %i[create delete update].freeze
+
     class << self
       # Reports differences between old and new course loader files
       # @param old_file [String] the old course loader filename
       # @param new_file [String] the new course loader filename
-      # @param delete [IO] the deletions file
-      # @param update [IO] the updates file
-      # @yield [old_line, new_line, op] passes the course loader lines and
-      #   operation (:delete|:new|:update) to the block
+      # @param opts [Hash] the diff options
+      # @option opts [IO] :create the new courses file
+      # @option opts [IO] :delete the deleted courses file
+      # @option opts [Boolean] :rollover if true, create new courses as
+      #   rollovers when rollover course/section are present
+      # @option opts [IO] :update the updated courses file
+      # @yield [old_line, new_line, op, opts] passes course loader lines,
+      #   operation (:create|:delete|:update) and diff options to the block; the
+      #   block is only called for differences between files
       # @yieldparam old_line [String] the old course loader line
       # @yieldparam new_line [String] the new course loader line
-      # @yieldparam op [Symbol] the operation (:delete|:new|:update)
+      # @yieldparam op [Symbol] the operation (:create|:delete|:update)
+      # @yieldparam opts [Hash] the diff options
       # @return [void]
-      def diff(old_file = nil, new_file = nil, delete: nil, update: nil, &block)
+      def diff(old_file = nil, new_file = nil, **opts, &block)
         # Read the course loader data from the old and new files
         old = read(old_file)
         new = read(new_file)
-        # Create the deletions and updates output files
-        del = open(delete)
-        upd = open(update)
+        # Create the creations, deletions and updates output files
+        files = open_output_files(opts)
         # Perform the diff
-        process(old, new, del, upd, &block)
+        process(old, new, files, opts, &block)
       ensure
-        del.close if del
-        upd.close if upd
+        close_output_files(files)
       end
 
       private
 
+      # Returns true if the course entry has rollover course/section, else false
+      # @param fields [Array<String>] the course loader fields
+      # @return [Boolean] true if rollover course/section are set, else false
+      def can_rollover?(fields)
+        # Rollover requires course code and section
+        return false if fields[29].nil? || fields[29].empty?
+        return false if fields[30].nil? || fields[30].empty?
+        true
+      end
+
+      # Closes output files
+      # @param files [Hash<Symbol, IO>] the output files
+      # @return [void]
+      def close_output_files(files = nil)
+        files.values.each(&:close) if files
+      end
+
       # Formats the course loader line for the specified operation
       # @param line [String] the course loader line
-      # @param op [Symbol] the operation (:delete|:new|:update), default :update
+      # @param op [Symbol] the operation (:create|:delete|:update)
+      # @param opts [Hash<Symbol, Object>] the diff options
       # @return [String] the course loader line with the specified operation
-      def format(line, op = nil)
-        # Check the operation is valid
-        op ||= :update
-        unless %i[delete new update].include?(op)
-          raise ArgumentError('Operation must be :delete or :update')
-        end
+      def format(line, op, opts = {})
         # Format the line (rollover code/section are never needed)
         line = line.split("\t")
-        line[28] = op == :delete ? 'DELETE' : ''
-        line[29] = ''
-        line[30] = ''
+        if op == :create && opts[:rollover] && can_rollover?(line)
+          line[28] = 'ROLLOVER' # Rollover code/section already present
+        elsif op == :delete
+          line[28..30] = ['DELETE', '', ''] # Rollover code/section not needed
+        else # op is either :create without rollover or :update
+          line[28..30] = ['', '', ''] # Update, rollover code/section not needed
+        end
         # Return the formatted line
         line.join("\t")
       end
@@ -67,14 +96,24 @@ module AlmaCourseLoader
         File.open(file, mode)
       end
 
+      # Creates output files
+      # @param opts [Hash] the diff options
+      # @return [Hash<Symbol, IO>] the output files, indexed by operation
+      #   (:create|:delete|:update)
+      def open_output_files(opts)
+        files = {}
+        OPS.each { |op| files[op] = open(opts[op]) }
+        files
+      end
+
       # Returns the diff operation
       # @param old_line [String] the old course loader line
       # @param new_line [String] the new course loader line
-      # @return [Symbol, nil] the operation (:delete|:new|:update) or nil if
+      # @return [Symbol, nil] the operation (:create|:delete|:update) or nil if
       #   there are no changes
       def operation(old_line = nil, new_line = nil)
         return nil if old_line == new_line
-        return :new if old_line.nil?
+        return :create if old_line.nil?
         return :delete if new_line.nil?
         :update
       end
@@ -82,22 +121,18 @@ module AlmaCourseLoader
       # Process the input files
       # @param old [Hash<String, String>] the old course loader data
       # @param new [Hash<String, String>] the new course loader data
-      # @param del [IO] the deletions output file
-      # @param upd [IO] the updates output file
-      # @yield [old_line, new_line, op] passes the course loader lines and
-      #   operation (:delete|:new|:update) to the block
-      # @yieldparam old_line [String] the old course loader line
-      # @yieldparam new_line [String] the new course loader line
-      # @yieldparam op [Symbol] the operation (:delete|:new|:update)
+      # @param files [Hash<Symbol, IO>] the output files, indexed by operation
+      #   (:create|:delete|:update)
+      # @param opts [Hash] the diff options
       # @return [void]
-      def process(old, new, del = nil, upd = nil, &block)
+      def process(old, new, files = nil, opts = {}, &block)
         # Handle deletions and updates to the old file
         old.each do |course, line|
-          write(line, new[course], delete: del, update: upd, &block)
+          write(line, new[course], files, opts, &block)
         end
         # Handle new additions to the old file
         new.each do |course, line|
-          write(nil, line, update: upd, &block) unless old.key?(course)
+          write(nil, line, files, opts, &block) unless old.key?(course)
         end
       end
 
@@ -117,26 +152,21 @@ module AlmaCourseLoader
       # Write the diff result to the appropriate output file
       # @param old_line [String] the old course loader line
       # @param new_line [String] the new course loader line
-      # @param delete [IO] the deletions file
-      # @param update [IO] the updates file
-      # @yield [old_line, new_line, op] passes the course loader lines and
-      #   operation (:new|:update) to the block
-      # @yieldparam old_line [String] the old course loader line
-      # @yieldparam new_line [String] the new course loader line
-      # @yieldparam op [Symbol] the operation (:new|:update)
+      # @param files [Hash<Symbol, IO>] the output files, indexed by operation
+      #   (:create|:delete|:update)
+      # @param opts [Hash] the diff options
       # @return [void]
-      def write(old_line = nil, new_line = nil, delete: nil, update: nil)
+      def write(old_line = nil, new_line = nil, files = nil, opts = {})
         # Determine the diff operation
         op = operation(old_line, new_line)
         return if op.nil?
         # Call the block
-        yield(old_line, new_line, op) if block_given?
+        yield(old_line, new_line, op, opts) if block_given?
         # Write the line to the update file
-        if op == :delete
-          delete.write("#{format(old_line, op)}\n") unless delete.nil?
-        else
-          update.write("#{format(new_line, op)}\n") unless update.nil?
-        end
+        line = op == :delete ? old_line : new_line
+        files[op].write("#{format(line, op, opts)}\n") if files[op]
+      rescue SkipCourse
+        # The block requested that this course is skipped
       end
     end
   end

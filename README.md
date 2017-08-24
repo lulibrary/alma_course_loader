@@ -74,18 +74,78 @@ upd=${dir_update}/$today
 
 This script accepts two course loader files (the "current" or most-recently
 created file, and the "previous" file preceding the current file) and outputs
-a file of deletions (courses appearing on the previous file but not in the
-current file) and a file of additions/updates (courses appearing in the current
-file which do not appear or differ from those in the previous file). These files
-can be loaded into Alma to perform the required changes.
+the course entries which differ between the files. These files can be loaded
+into Alma to perform the required changes.
 
-Basic usage is:
+The differences are written to three files:
+
+* `create-file` contains new courses (those in `current-file` which are not in
+  `previous-file`) - by default these are applied using the *update* method
+  unless the `--rollover` flag is specified, which triggers updates using the
+  *rollover* method.
+  
+* `delete-file` contains deleted course (those in `previous-file` which are not
+  in `current-file`) - these are applied using the *delete* method.
+  
+* `update-file` contains courses which exist in both files but differ - these
+  are applied using the *update* method.  
+
+To allow course creation by *rollover* both input files should include the
+rollover course code and section fields. If these fields are not present, all
+courses will be created by *update* so associated reading lists will not be
+copied.
+
+`course_loader_diff` accepts the following command-line options:
 ```bash
-course_loader_diff -d deletions-file -u updates-file previous-file current-file
+course_loader_diff -c create-file
+                   -d delete-file
+                   [-h | --help]
+                   [-l | --log log-file]
+                   [-r | --rollover]
+                   -u update-file
+                   [-v | --verbose]
+                   previous-file current-file
 ```
-where `deletions-file` is the output file of deletions, `updates-file` is the
-output file of additions/updates, `previous-file` is the previous input file and
-`current-file` is the current input file.
+
+##### `-c create-file | --create=create-file`
+
+The output file of newly-created courses.
+
+##### `-d delete-file | --delete=delete-file`
+
+The output file of deleted courses.
+
+##### `-h | --help`
+
+Displays a help page for the command-line interface.
+
+##### `-l log-file | --log=log-file`
+
+The activity log file (defaults to stdout).
+
+##### `-r | --rollover`
+
+Causes newly-created courses to be created using the *rollover* method rather
+than the *update* method as long as the course entry contains both the rollover
+course and section fields. Courses which omit either of the rollover course
+fields will be created using the *update* method.
+
+##### `-u update-file | --update=update-file`
+
+The output file of updated courses.
+
+##### `-v | --verbose`
+
+Causes the course loader entries to be included in the activity log, prefixed by
+'<' (`previous-file`) and `>` (`current-file`).
+
+##### `previous-file`
+
+The input file from a previous course loader run, e.g. yesterday.
+
+##### `current-file`
+
+The input file from the latest course loader run, e.g. today.
 
 Detailed usage is available from the command's help page:
 ```bash
@@ -436,7 +496,7 @@ the file to be deleted when the file is processed by Alma.
 
 ##### `-e env-file | --env=env-file`
 
-Specifies a file of environment variable definitions for configuration
+Specifies a file of environment variable definitions for configuration.
 
 ##### `-f filter | --filter=filter`
 
@@ -455,15 +515,15 @@ Displays a help page for the command-line interface.
 
 ##### `-l log-file | --log-file=log-file`
 
-Specifies a file for logging course loader activity
+Specifies a file for logging course loader activity.
 
 ##### `-L log-level | --log-level=log-level`
 
-Specifies the logging level: `fatal|error|warn|info|debug`
+Specifies the logging level: `fatal|error|warn|info|debug`.
 
 ##### `-o out-file | --out-file=out-file`
 
-Specifies the output course loader file
+Specifies the output course loader file.
 
 ##### `-r | --rollover`
 
