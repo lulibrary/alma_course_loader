@@ -269,12 +269,21 @@ to extractor `Proc` instances.
  
 The general form of a filter specification string is:
 
-```field[+|-]value```
+```[field [op ]]value```
 
 where:
  * `field` is the name of a defined field extractor,
- * `+` means that `value` mus include the field value;
- * `-` means that `value` must not include the field value.
+ * `op` is one of the following operators:
+   * `<`, `<=`, `==`, `!=`, `>=`, `>` the value of field is less than (etc.)
+     value
+   * `~`, `!~` the value of field matches/does not match the regular expression
+     value  
+   * `in` the value of field is a key (if value is a hash) or a value (if value
+     is any other type) in value; equivalent to value.include?(field)
+   * `keyin` the value of field is a key of the value hash; equivalent
+     to value.key?(field)
+   * `valuein` the value of field is a value in the value hash; equivalent to
+     value.value?(field)      
  * `value` is either a JSON string (which must include double-quotes around string
 literal values and may specify arrays and hashes) or a regular expression
 delimited by `/`.
