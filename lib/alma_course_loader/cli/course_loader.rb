@@ -1,6 +1,8 @@
 require 'clamp'
 require 'dotenv'
 
+require 'alma_course_loader/filter'
+
 module AlmaCourseLoader
   module CLI
     # The abstract base class for course loader command line processing
@@ -14,8 +16,8 @@ module AlmaCourseLoader
       option %w[-d --delete], :flag, 'generate a course delete file'
       option %w[-e --env-file], 'ENV_FILE', 'environment definitions file'
       option %w[-f --filter], 'FILTER',
-             'filter condition: [field][+|-]value', multivalued: true do |value|
-        Filter.parse(value, extractors)
+             'filter condition: [field][op]value', multivalued: true do |value|
+        AlmaCourseLoader::Filter.parse(value, extractors)
       end
       option %w[-F --fields], :flag, 'list the fields available to filters'
       option %w[-l --log-file], 'LOG_FILE', 'the activity log file'

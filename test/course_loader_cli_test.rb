@@ -35,9 +35,9 @@ class CourseLoaderCLITest < Minitest::Test
   def args_test_cli(file)
     args = []
     # Add a filter by cohort
-    args.push('-f', 'cohort-/-2015-2$/')
+    args.push('-f', 'cohort !~ /-2015-2$/')
     # Add filters by course
-    args.push('-f', 'course-["CRS103-2016", "CRS104-2016", "CRS107-2016"]')
+    args.push('-f', '! course in ["CRS103-2016", "CRS104-2016", "CRS107-2016"]')
     # Add time periods
     [2015, 2016, 2017].map { |t| args.push('-t', t.to_s) }
     # Add the output filename

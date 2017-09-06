@@ -269,9 +269,10 @@ to extractor `Proc` instances.
  
 The general form of a filter specification string is:
 
-```[field [op ]]value```
+```[!][field [op ]]value```
 
 where:
+ * `!` negates the condition
  * `field` is the name of a defined field extractor,
  * `op` is one of the following operators:
    * `<`, `<=`, `==`, `!=`, `>=`, `>` the value of field is less than (etc.)
@@ -292,16 +293,16 @@ Examples:
 
 ```ruby
 # Course code must exactly match CS101
-course_code+"CS101"    
+course_code == "CS101"    
 
 # Course code must be one of CS101, CS102 or CS103
-course_code+["CS101", "CS102", "CS103"]
+course_code in ["CS101", "CS102", "CS103"]
 
 # Year must not be 2015 or 2016
-year-[2015, 2016]
+! year in [2015, 2016]
 
 # Course code must begin with CS
-course_code+/^CS/
+course_code ~ /^CS/
 ```
 
 ##### Examples 
@@ -315,18 +316,41 @@ extractors = { code: get_code }
 
 # Include only the specified codes
 filter = AlmaCourseLoader::Filter.new(codes, :include, get_code)
-
-# As above using a filter specification string
-filter = AlmaCourseLoader::Filter.parse('code+["COMPSCI101", "MAGIC101"]', extractors)
+# Using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('code in ["COMPSCI101", "MAGIC101"]', extractors)
 
 # Include all except the specified codes
-filter = AlmaCourseLoader::Filter.new(codes, :exclude, get_code)
+filter = AlmaCourseLoader::Filter.new(codes, :include, get_code, true)
+# Using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('! code in ["COMPSCI101", "MAGIC101"]')
 
 # Include all codes matching the regular expression
-filter = AlmaCourseLoader::Filter.new(year1_magic, :include, get_code)
+filter = AlmaCourseLoader::Filter.new(year1_magic, :match, get_code)
+# Using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('code ~ /MAGIC\d\d/', extractors)
 
-# As above using a filter specification string
-filter = AlmaCourseLoader::Filter.parse('code+/MAGIC\d\d/', extractors)
+# Include exactly the specified code
+filter = AlmaCourseLoader::Filter.new('MAGIC101', :==, get_code)
+# Using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('code == "MAGIC101"', extractors)
+
+# Include all except the specified code
+filter = AlmaCourseLoader::Filter.new('MAGIC101', :!=, get_code)
+# or equivalently
+filter = AlmaCourseLoader::Filter.new('MAGIC101', :==, get_code, true)
+# Using a filter specification string
+filter = AlmaCourseLoader::Filter.parse('code != "MAGIC101"', extractors)
+# or equivalently
+filter = AlmaCourseLoader::Filter.parse('! code == "MAGIC101"', extractors)
+
+# Include all codes stringwise less than "MAGIC101"
+# - note that comparison operators are called against the filter value,
+#   so "code < filter-value" must be formulated as "filter-value > code"
+ #  and "code > filter-value" as "filter-value < code"
+filter = AlmaCourseLoader::Filter.new('MAGIC101', :>, get_code)
+# Using a filter specification string
+# - no need to invert the test as above, the parser handles this
+filter = AlmaCourseLoader::Filter.parse('code < "MAGIC101"', extractors)
 ```
 
 ##### Executing a filter
