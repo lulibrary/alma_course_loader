@@ -13,16 +13,20 @@ module AlmaCourseLoader
       EXIT_OK = 0
 
       # Clamp command-line options
-      option %w[-d --delete], :flag, 'generate a course delete file'
+      option %w[-d --delete], :flag, 'generate a course delete file',
+             default: false
       option %w[-e --env-file], 'ENV_FILE', 'environment definitions file'
       option %w[-f --filter], 'FILTER',
              'filter condition: [field][op]value', multivalued: true do |value|
         AlmaCourseLoader::Filter.parse(value, extractors)
       end
-      option %w[-F --fields], :flag, 'list the fields available to filters'
+      option %w[-F --fields], :flag, 'list the fields available to filters',
+             default: false
       option %w[-l --log-file], 'LOG_FILE', 'the activity log file'
       option %w[-L --log-level], 'LOG_LEVEL',
-             'the log level (fatal|error|warn|info|debug)' do |value|
+             'the log level (fatal|error|warn|info|debug)',
+             default: 'info' \
+             do |value|
         {
           debug: Logger::DEBUG,
           error: Logger::ERROR,
@@ -32,7 +36,8 @@ module AlmaCourseLoader
         }[value.downcase.to_sym] || Logger::ERROR
       end
       option %w[-o --out-file], 'OUT_FILE', 'the output file'
-      option %w[-r --rollover], :flag, 'generate a course rollover file'
+      option %w[-r --rollover], :flag, 'generate a course rollover file',
+             default: false
       option %w[-t --time-period], 'PERIOD',
              'the academic year (2016 etc.)', multivalued: true do |value|
         time_period(value)
