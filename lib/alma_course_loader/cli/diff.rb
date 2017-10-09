@@ -1,6 +1,8 @@
 require 'clamp'
 require 'logger'
 
+require 'alma_course_loader/diff'
+
 module AlmaCourseLoader
   module CLI
     # Implements the course_loader_diff command-line interface
